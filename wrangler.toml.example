@@ -1,0 +1,11 @@
+# OPCIONAL. Solo si querés desplegar por consola (npm run cf:deploy) con el
+# binding definido en este archivo. Si desplegás conectando GitHub, NO lo uses:
+# configurá el binding D1 en el panel (ver README) y dejá este archivo con este nombre.
+name = "trading-desk"
+compatibility_date = "2024-11-01"
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "TU_BASE_D1"          # el nombre que ves en Workers & Pages > D1
+database_id = "TU_DATABASE_ID"        # el ID que ves en el panel de esa base

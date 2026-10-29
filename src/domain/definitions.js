@@ -1,0 +1,22 @@
+// Definiciones y fórmulas mostradas en los tooltips de cada indicador.
+export const DEF = {
+  net: 'Resultado realizado neto: suma de (precio de venta − costo promedio) × cantidad − comisión de venta, de las ventas del período. Las comisiones de compra ya están dentro del costo promedio.',
+  returnPct: 'Resultado realizado ÷ costo de las posiciones vendidas en el período. No es rentabilidad del patrimonio total.',
+  basis: 'Costo de adquisición (con comisiones de compra) de las cantidades vendidas en el período.',
+  count: 'Cantidad de ventas ejecutadas (cada venta cierra, total o parcialmente, una posición). Se agrupa por fecha de venta.',
+  winRate: 'Ventas ganadoras ÷ ventas totales. Un win rate alto no implica rentabilidad: depende del tamaño de ganancias y pérdidas.',
+  wins: 'Ventas con resultado mayor a $0,005.',
+  losses: 'Ventas con resultado menor a −$0,005.',
+  avgWin: 'Ganancia bruta ÷ cantidad de ventas ganadoras.',
+  avgLoss: 'Pérdida bruta ÷ cantidad de ventas perdedoras.',
+  payoff: 'Ganancia media ÷ pérdida media.',
+  profitFactor: 'Ganancia bruta ÷ pérdida bruta. Mayor a 1 = el período fue rentable. Sin pérdidas no se puede calcular.',
+  expectancy: 'Resultado neto ÷ cantidad de ventas: lo que se espera ganar por operación cerrada, en promedio.',
+  best: 'Mayor resultado individual de una venta.',
+  worst: 'Menor resultado individual de una venta.',
+  fees: 'Comisiones imputadas a las ventas del período. Las de compra están incluidas en el costo.',
+  maxDD: 'Mayor caída, en dinero, desde un máximo de la curva de resultado realizado acumulado (el pico inicial es 0). No es drawdown del patrimonio porque el backend no guarda valuaciones diarias.',
+  ddDur: 'Días entre el máximo previo y el punto de mayor profundidad medido en la curva (el peor tramo en días).',
+  streakW: 'Mayor cantidad de ventas ganadoras consecutivas.',
+  streakL: 'Mayor cantidad de ventas perdedoras consecutivas.',
+}
