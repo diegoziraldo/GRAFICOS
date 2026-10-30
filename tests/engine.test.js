@@ -145,3 +145,33 @@ describe('importación de backup (portfolio_id + nombres)', () => {
     expect(r.portfolios).toEqual([{ id: 1, name: 'SILVIO' }, { id: 3, name: 'DIEGO' }])
   })
 })
+
+import { replay, tradeTotals, holdStats, daysBetween } from '../src/domain/asset.js'
+describe('detalle de activo', () => {
+  const ts = [
+    buy('2025-01-02', 'Z', 10, 100, { fee: 10 }), buy('2025-01-05', 'Z', 10, 120),
+    sell('2025-01-09', 'Z', 5, 130, { fee: 5 }), sell('2025-01-20', 'Z', 15, 140),
+  ]
+  it('replay coincide con el motor: costo promedio y posición', () => {
+    const r = replay(ts)
+    expect(r.get(ts[1].id).avgAfter).toBeCloseTo((10 * 100 + 10 + 10 * 120) / 20)
+    expect(r.get(ts[2].id).qtyAfter).toBe(15)
+    expect(r.get(ts[2].id).avgAfter).toBeCloseTo(r.get(ts[1].id).avgAfter) // vender no cambia el promedio
+    expect(r.get(ts[3].id).qtyAfter).toBe(0)
+    expect(r.get(ts[3].id).avgAfter).toBeNull()
+    const { open } = buildLedger(ts.slice(0, 3))
+    expect(open[0].avgCost).toBeCloseTo(r.get(ts[2].id).avgAfter)
+  })
+  it('totales, comisiones y precios promedio', () => {
+    const t = tradeTotals(ts)
+    expect(t.buys.qty).toBe(20); expect(t.sells.qty).toBe(20)
+    expect(t.buys.avg).toBeCloseTo(110); expect(t.fees).toBe(15)
+    expect(t.first).toBe('2025-01-02'); expect(t.last).toBe('2025-01-20')
+  })
+  it('estadísticas de tenencia y días', () => {
+    const h = holdStats(buildLedger(ts).events)
+    expect(h).toMatchObject({ min: 7, max: 18 }); expect(h.avg).toBeCloseTo(12.5)
+    expect(holdStats([])).toBeNull()
+    expect(daysBetween('2025-01-01', '2025-01-31')).toBe(30)
+  })
+})

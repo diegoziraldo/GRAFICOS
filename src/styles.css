@@ -152,3 +152,9 @@ select, input { background: var(--panel); border-color: var(--line); }
 .big.muted b { color: var(--muted); } .warn { color: #ffe3a1; background: #3a2e0f; border-color: #8a6a1c; }
 .eye { background: var(--panel); color: var(--text); border: 1px solid #2c4380; border-radius: 6px; padding: 7px 9px; display: grid; place-items: center; }
 .eye:hover { border-color: var(--accent); } .eye.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ===== Detalle de activo ===== */
+.asset-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; } .asset-head .cur-title { margin: 14px 0 8px; }
+.tag.pf { background: #1b2c52; color: #cfe0ff; } .sec { margin: 22px 0 10px; font-size: 15px; } .sec small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.sub { color: var(--muted); font-size: 11px; } .note { color: var(--muted); }
+.sub.blk { display: block; }
