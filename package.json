@@ -8,8 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "cf:dev": "npm run build && wrangler pages dev dist --d1=DB",
-    "cf:deploy": "npm run build && wrangler pages deploy dist --project-name=trading-desk"
+    "cf:dev": "npm run build && wrangler dev",
+    "cf:deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "chart.js": "^4.4.4",
@@ -18,9 +18,9 @@
     "vue-router": "^4.4.5"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^5.2.4",
-    "vite": "^6.4.5",
-    "vitest": "^2.1.9",
+    "@vitejs/plugin-vue": "^5.1.4",
+    "vite": "^5.4.8",
+    "vitest": "^2.1.2",
     "wrangler": "^3.80.0"
   }
 }

@@ -3,7 +3,7 @@
 Un solo proyecto con todo lo necesario:
 
 - **Frontend** Vue 3 + Vite (`src/`).
-- **Backend** Pages Functions + Hono (`functions/`): API de **solo lectura** (`GET /api/trades`, `GET /api/portfolios`, `GET /api/health`). Usa tus archivos `functions/_lib/trades.js` y `portfolios.js` sin cambios, sobre tu base **D1 existente**.
+- **Backend** Hono (`worker/index.js` para Workers, `functions/api/[[route]].js` para Pages): API de **solo lectura** (`GET /api/trades`, `GET /api/portfolios`, `GET /api/health`). Usa tus archivos `functions/_lib/trades.js` y `portfolios.js` sin cambios, sobre tu base **D1 existente**.
 - **No toca la base**: no hay rutas para crear, editar ni borrar. No hace falta correr migraciones (tu D1 ya tiene `ccl`, `sector` y `portfolio_id`).
 
 > Es un proyecto **nuevo** de Pages: no reemplaza tu bitácora actual (`trader-page`). Los dos pueden compartir la misma base D1.
@@ -11,30 +11,22 @@ Un solo proyecto con todo lo necesario:
 ## ⚠️ Privacidad
 Los GET no piden login: cualquiera que conozca la URL puede ver tus operaciones. Protegé el sitio con **Cloudflare Access** (gratis): Zero Trust → Access → Applications → Add → Self-hosted → dominio `tu-proyecto.pages.dev` → política "Allow" solo para tu email.
 
-## Publicar (con GitHub) — recomendado
-1. Subí **el contenido de esta carpeta** a un repo de GitHub (en la raíz tienen que quedar `package.json`, `src/` y `functions/`). Si usás el repo `GRAFICOS`, reemplazá su contenido (borrá la carpeta `backend/` vieja: no se usa).
-2. Cloudflare → **Workers & Pages → Create → Pages → Connect to Git** → elegí el repo.
-3. Configuración de build:
-   - Framework preset: **None**
-   - Build command: `npm run build`
-   - Build output directory: `dist`
-   - Root directory: (vacío)
-4. **Save and Deploy**. (La primera vez la API todavía no ve la base: es normal.)
-5. En el proyecto: **Settings → Bindings → Add → D1 database**
-   - Variable name: **`DB`** (exactamente así, en mayúsculas)
-   - D1 database: elegí la base que ya usás.
-   - Agregalo en **Production** (y en Preview si querés).
-6. **Deployments → Retry deployment** (o hacé un push) para que tome el binding.
-7. Verificá: `https://TU-PROYECTO.pages.dev/api/health` → `{"status":"ok","mode":"read-only","db":true}` y `/api/trades` → JSON con tus operaciones.
+## Publicar como Worker (el flujo "Connect to Git" con Deploy command)
+Este proyecto trae `wrangler.jsonc` y `worker/index.js`, así que el comando por defecto `npx wrangler deploy` funciona sin cambios en el panel.
 
-## Publicar por consola (alternativa)
-```bash
-npm install
-cp wrangler.toml.example wrangler.toml   # completá database_name y database_id de tu D1
-npx wrangler login
-npm run cf:deploy
-```
-(No uses `wrangler.toml` si conectás por Git: ahí el binding se configura en el panel.)
+1. Abrí **`wrangler.jsonc`** y completá 3 datos:
+   - `"name"`: tiene que ser **igual al nombre de tu Worker** en Cloudflare (se ve arriba en el panel del proyecto).
+   - `"database_name"` y `"database_id"`: los ves en **Workers & Pages → D1 → tu base**. El `binding` debe quedar como `DB`.
+2. Subí el proyecto a GitHub (en la raíz: `package.json`, `wrangler.jsonc`, `worker/`, `functions/`, `src/`).
+3. Configuración de build en Cloudflare:
+   - Build command: `npm run build`
+   - Deploy command: `npx wrangler deploy`
+4. Al terminar el deploy, abrí `https://TU-WORKER.workers.dev/api/health` → debe decir `"db": true`.
+
+Alternativa por consola: `npx wrangler login` y luego `npm run cf:deploy`.
+
+### Si preferís Cloudflare *Pages*
+Creá el proyecto desde "Looking to deploy Pages? Get started" (build `npm run build`, salida `dist`) y agregá el binding D1 `DB` en Settings → Bindings. En ese caso **borrá `wrangler.jsonc`** del repo. La API de Pages es `functions/api/[[route]].js`.
 
 ## Desarrollo local
 - Contra tu sitio ya publicado: copiá `.env.example` a `.env`, poné `VITE_API_TARGET=https://TU-PROYECTO.pages.dev` y `npm run dev`.
