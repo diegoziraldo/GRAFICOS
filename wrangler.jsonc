@@ -1,7 +1,7 @@
 {
   // IMPORTANTE: "name" tiene que ser IGUAL al nombre de tu Worker en Cloudflare
   // (lo ves arriba en el panel de tu proyecto, en Workers & Pages).
-  "name": "trading-desk",
+  "name": "graficos",
   "main": "worker/index.js",
   "compatibility_date": "2024-11-01",
 
@@ -14,11 +14,11 @@
 
   // Tu base D1 existente. Completá estos dos datos (los ves en
   // Workers & Pages > D1 > tu base). El binding tiene que llamarse DB.
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "PONER_EL_NOMBRE_DE_TU_BASE",
-      "database_id": "PONER_EL_ID_DE_TU_BASE"
-    }
-  ]
+"d1_databases": [
+  {
+    "binding": "DB",
+    "database_name": "8262aeee-f264-49d9-b0b9-43fd783af8df",
+    "database_id": "8262aeee-f264-49d9-b0b9-43fd783af8df"
+  }
+]
 }
