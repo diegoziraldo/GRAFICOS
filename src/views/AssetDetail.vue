@@ -50,68 +50,119 @@ const resultOf = (e) => (e ? evValue(e, cur0.value) : null)
 const pctOf = (e) => (e ? (cur0.value === 'USD' ? e.plPctUSD : e.plPct) : null)
 const sellsList = computed(() => myTrades.value.filter((t) => t.operation === 'VENTA' && evById.value.get(t.id)).map((t) => ({ t, e: evById.value.get(t.id) })))
 
-// ---- Gráfico 1: precio operado, costo promedio y operaciones sobre el eje del tiempo real
+// ---- Gráfico 1: cada venta como un "palito" desde tu costo hasta el precio de venta
+const mainPf = computed(() => {
+  const c = new Map()
+  for (const t of tickerTrades.value) c.set(String(t.portfolioId ?? 'none'), (c.get(String(t.portfolioId ?? 'none')) || 0) + 1)
+  return [...c].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'all'
+})
+watch([ticker, () => trades.value.length], () => { scope.value = showScope.value ? mainPf.value : 'all' }, { immediate: true })
+const singlePf = computed(() => portfoliosOf.value.length === 1 || pf.value !== 'all')
+
+const bandPlugin = {
+  id: 'posBands',
+  beforeDatasetsDraw(chart, _a, opts) {
+    const { ctx, chartArea: a, scales: { x } } = chart
+    ctx.save(); ctx.fillStyle = 'rgba(77,131,255,.10)'
+    for (const b of opts.list || []) {
+      const x0 = Math.max(a.left, x.getPixelForValue(b.from)), x1 = Math.min(a.right, x.getPixelForValue(b.to))
+      if (x1 > x0) ctx.fillRect(x0, a.top, x1 - x0, a.bottom - a.top)
+    }
+    ctx.restore()
+  },
+}
+const labelPlugin = {
+  id: 'tradeLabels',
+  afterDatasetsDraw(chart) {
+    const { ctx, chartArea: a } = chart
+    ctx.save(); ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.lineJoin = 'round'; ctx.lineWidth = 3.5
+    const placed = [] // evita que dos etiquetas se pisen
+    chart.data.datasets.forEach((ds, i) => {
+      if (!ds.sellLabels) return
+      chart.getDatasetMeta(i).data.forEach((el, j) => {
+        const raw = ds.data[j]
+        if (!raw?.label) return
+        const w = ctx.measureText(raw.label).width
+        const cx = Math.min(a.right - w / 2 - 2, Math.max(a.left + w / 2 + 2, el.x))
+        const dir = ds.sellLabels === 'up' ? -1 : 1
+        let y = dir < 0 ? el.y - raw.r - 6 : el.y + raw.r + 14
+        for (let k = 0; k < 6 && placed.some((r) => Math.abs(r.x - cx) < (r.w + w) / 2 + 2 && Math.abs(r.y - y) < 13); k++) y += dir * 13
+        y = Math.min(a.bottom - 4, Math.max(a.top + 12, y))
+        placed.push({ x: cx, y, w })
+        ctx.strokeStyle = '#0b1325'; ctx.strokeText(raw.label, cx, y)
+        ctx.fillStyle = ds.labelColor; ctx.fillText(raw.label, cx, y)
+      })
+    })
+    ctx.restore()
+  },
+}
+
 const priceCfg = computed(() => {
   const list = myTrades.value
   if (!list.length) return null
   const x = (d) => Date.parse(d)
   const maxQ = Math.max(...list.map((t) => t.quantity))
-  const radius = (t) => 4 + Math.sqrt(t.quantity / maxQ) * 7
-  const mk = (t) => ({ x: x(t.date), y: t.price, t, r: radius(t), ev: evById.value.get(t.id) })
-  const buys = list.filter((t) => t.operation === 'COMPRA').map(mk)
-  const sells = list.filter((t) => t.operation === 'VENTA').map(mk)
-  const win = sells.filter((s) => s.ev && s.ev.pl > 0.005), loss = sells.filter((s) => s.ev && s.ev.pl <= 0.005), other = sells.filter((s) => !s.ev)
+  const rad = (t) => 4.5 + Math.sqrt(t.quantity / maxQ) * 5
+  const buys = list.filter((t) => t.operation === 'COMPRA').map((t) => ({ x: x(t.date), y: t.price, t, r: rad(t) }))
 
-  // Una línea de costo promedio por cartera (cada cartera tiene su propio costo).
-  const groups = new Map()
-  for (const t of list) { const k = String(t.portfolioId ?? 'none'); groups.set(k, [...(groups.get(k) || []), t]) }
-  const COLORS = [C.warn, '#c792ea', '#5ad1e6', '#ff9f68', '#9be15d']
-  let anyOpen = false
-  const costSets = [...groups].map(([k, ts], i) => {
-    const pts = []
-    for (const t of ts) {
-      const r = rows.value.get(t.id)
-      if (t.operation === 'COMPRA') pts.push({ x: x(t.date), y: r.avgAfter })
-      else if (r.avgBefore != null) { pts.push({ x: x(t.date), y: r.avgBefore }); if (r.qtyAfter === 0) pts.push({ x: x(t.date), y: null }) }
-    }
-    if (rows.value.get(ts[ts.length - 1].id).qtyAfter > 0) { pts.push({ x: x(today), y: rows.value.get(ts[ts.length - 1].id).avgAfter }); anyOpen = true }
-    const label = groups.size > 1 ? `Costo prom. · ${portfolioName(k === 'none' ? null : Number(k))}` : 'Costo promedio'
-    return { label, data: pts, borderColor: COLORS[i % COLORS.length], borderDash: [6, 4], borderWidth: 2, stepped: 'after', pointRadius: 0, pointHitRadius: 0, pointHoverRadius: 0, spanGaps: false, tip: false }
+  const sellsAll = list.filter((t) => t.operation === 'VENTA' && evById.value.get(t.id)).map((t) => {
+    const ev = evById.value.get(t.id), cost = ev.costBasis / ev.qty
+    return { t, ev, cost, win: ev.pl > 0.005, label: `${pct(ev.plPct, 1)} · ${ev.days ?? '—'} d` }
   })
+  const markers = (arr, up) => arr.map((s) => ({ x: x(s.t.date), y: s.t.price, t: s.t, ev: s.ev, r: rad(s.t), label: s.label, up }))
+  const sticks = (arr) => { const d = []; for (const s of arr) d.push({ x: x(s.t.date), y: s.cost }, { x: x(s.t.date), y: s.t.price }, { x: x(s.t.date), y: null }); return d }
+  const wins = sellsAll.filter((s) => s.win), losses = sellsAll.filter((s) => !s.win)
+
+  // Costo promedio escalonado + tiempo con posición abierta (solo si es una cartera)
+  const cost = [], bands = []
+  let anyOpen = false
+  if (singlePf.value) {
+    let start = null, prevQty = 0
+    for (const t of list) {
+      const r = rows.value.get(t.id)
+      if (t.operation === 'COMPRA') { cost.push({ x: x(t.date), y: r.avgAfter }); if (prevQty === 0) start = x(t.date) }
+      else if (r.avgBefore != null) { cost.push({ x: x(t.date), y: r.avgBefore }); if (r.qtyAfter === 0) { cost.push({ x: x(t.date), y: null }); if (start != null) bands.push({ from: start, to: x(t.date) }); start = null } }
+      prevQty = r.qtyAfter
+    }
+    if (prevQty > 0) { anyOpen = true; cost.push({ x: x(today), y: rows.value.get(list[list.length - 1].id).avgAfter }); if (start != null) bands.push({ from: start, to: x(today) }) }
+  } else anyOpen = myOpen.value.length > 0
   const first = x(list[0].date), last = Math.max(x(list[list.length - 1].date), anyOpen ? x(today) : 0)
-  const pad = Math.max(2, (last - first) / 864e5 * 0.04) * 864e5
+  const pad = Math.max(3, (last - first) / 864e5 * 0.05) * 864e5
 
   const o = baseOptions('ARS', { interaction: { mode: 'nearest', intersect: true } })
+  o.layout = { padding: { top: 14, right: 8 } }
   o.scales.x = { type: 'linear', min: first - pad, max: last + pad, grid: { display: false },
     ticks: { maxTicksLimit: 7, maxRotation: 0, callback: (v) => new Date(v).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: '2-digit' }) } }
-  o.scales.y = { ticks: { callback: (v) => money(v, 'ARS', Math.abs(v) < 100 ? 2 : 0) } }
-  o.plugins.legend = { display: true, labels: { usePointStyle: true, boxWidth: 8, filter: (i) => !i.text.startsWith('_') } }
+  o.scales.y = { grace: '10%', ticks: { callback: (v) => money(v, 'ARS', Math.abs(v) < 100 ? 2 : 0) } }
+  o.plugins.legend = { display: false }
+  o.plugins.posBands = { list: bands }
   o.plugins.tooltip.filter = (i) => i.dataset.tip
   o.plugins.tooltip.callbacks = {
     title: (it) => date(new Date(it[0].parsed.x).toISOString().slice(0, 10)),
-    label: (c) => {
-      const { t, ev } = c.raw
-      const head = `${t.operation === 'COMPRA' ? 'Compra' : 'Venta'} · ${qty(t.quantity)} u. a ${money(t.price)}`
-      return head
-    },
+    label: (c) => { const { t } = c.raw; return `${t.operation === 'COMPRA' ? 'Compra' : 'Venta'} · ${qty(t.quantity)} u. a ${money(t.price)}` },
     afterLabel: (c) => {
       const { t, ev } = c.raw
       const r = rows.value.get(t.id)
       const out = [`Importe: ${money(t.quantity * t.price)} · Comisión: ${money(t.fee)}`]
-      if (ev) out.push(`Resultado: ${signedMoney(resultOf(ev), cur0.value)} (${pct(pctOf(ev))})`, `Días en posición: ${ev.days ?? '—'}`)
+      if (ev) {
+        out.push(`Costo promedio: ${money(ev.costBasis / ev.qty)}`, `Resultado: ${signedMoney(ev.pl, 'ARS')} (${pct(ev.plPct)})`)
+        if (currencies.value.includes('USD')) out.push(`Resultado USD: ${ev.plUSD == null ? 'sin CCL' : signedMoney(ev.plUSD, 'USD') + ' (' + pct(ev.plPctUSD) + ')'}`)
+        out.push(`Días en posición: ${ev.days ?? '—'}`)
+      }
       if (r) out.push(`Posición después: ${qty(r.qtyAfter)} u.${r.avgAfter ? ' · costo prom. ' + money(r.avgAfter) : ''}`)
       return out
     },
   }
-  const pts = (label, data, color, style, rot) => ({ label, data, tip: true, showLine: false, backgroundColor: color, borderColor: '#050a14', borderWidth: 1.5,
-    pointStyle: style, rotation: rot, pointRadius: (c) => c.raw?.r ?? 5, pointHoverRadius: (c) => (c.raw?.r ?? 5) + 2 })
-  return { type: 'line', data: { datasets: [
-    { label: '_precio', data: list.map((t) => ({ x: x(t.date), y: t.price })), borderColor: 'rgba(169,184,214,.45)', borderWidth: 1.5, pointRadius: 0, pointHitRadius: 0, pointHoverRadius: 0, tip: false },
-    ...costSets,
-    pts('Compras', buys, C.accent, 'triangle', 0),
-    pts('Ventas ganadoras', win, C.gain, 'triangle', 180),
-    pts('Ventas perdedoras', loss, C.loss, 'triangle', 180),
-    ...(other.length ? [pts('Ventas sin costo', other, '#8ea0c0', 'rectRot', 0)] : []),
+  const line = (label, data, color, extra = {}) => ({ label, data, borderColor: color, pointRadius: 0, pointHitRadius: 0, pointHoverRadius: 0, spanGaps: false, tip: false, ...extra })
+  const dots = (label, data, color, style, rot, extra = {}) => ({ label, data, tip: true, showLine: false, backgroundColor: color, borderColor: '#050a14', borderWidth: 1.5,
+    pointStyle: style, rotation: rot, pointRadius: (c) => c.raw?.r ?? 5, pointHoverRadius: (c) => (c.raw?.r ?? 5) + 2, ...extra })
+  return { type: 'line', plugins: [bandPlugin, labelPlugin], data: { datasets: [
+    ...(cost.length ? [line('Costo promedio', cost, C.warn, { borderDash: [6, 4], borderWidth: 2, stepped: 'after' })] : []),
+    line('Palito ganancia', sticks(wins), C.gain, { borderWidth: 3 }),
+    line('Palito pérdida', sticks(losses), C.loss, { borderWidth: 3 }),
+    dots('Compras', buys, C.accent, 'circle', 0),
+    dots('Ventas ganadoras', markers(wins, true), C.gain, 'triangle', 180, { sellLabels: 'up', labelColor: C.gain }),
+    dots('Ventas perdedoras', markers(losses, false), C.loss, 'triangle', 180, { sellLabels: 'down', labelColor: C.loss }),
   ] }, options: o }
 })
 
@@ -197,8 +248,16 @@ const plural = (n, s, p) => `${n} ${n === 1 ? s : p}`
         <KpiCard label="Tenencia promedio" :value="hold ? num(hold.avg, 1) + ' días' : '—'" :sub="hold ? `Mediana ${num(hold.median, 1)} · mín ${hold.min} · máx ${hold.max}` : 'Sin ventas en el período'" help="Días desde que se abrió la posición hasta cada venta (promedio simple)." />
       </div>
 
-      <Panel title="Compras y ventas sobre el precio" note="Eje horizontal con fechas reales. Triángulo azul = compra · triángulo hacia abajo verde/rojo = venta con ganancia/pérdida · el tamaño indica la cantidad. Las líneas escalonadas punteadas son tu costo promedio (una por cartera): una venta por encima de la línea gana. Pasá el mouse por cada marca para ver el detalle.">
-        <ChartCanvas v-if="priceCfg" :config="priceCfg" :height="340" />
+      <Panel title="Compras y ventas sobre el precio" note="Cómo leerlo: cada palito vertical une tu costo promedio con el precio al que vendiste. Verde hacia arriba = ganaste, rojo hacia abajo = perdiste. El texto indica la rentabilidad neta y los días que tuviste la posición. Precios en ARS.">
+        <ul class="chart-legend">
+          <li><i class="lg-dot" /> Compra <small>(tamaño = cantidad)</small></li>
+          <li><i class="lg-tri win" /> Venta con ganancia</li>
+          <li><i class="lg-tri loss" /> Venta con pérdida</li>
+          <li v-if="singlePf"><i class="lg-dash" /> Costo promedio</li>
+          <li v-if="singlePf"><i class="lg-band" /> Posición abierta</li>
+        </ul>
+        <ChartCanvas v-if="priceCfg" :config="priceCfg" :height="360" />
+        <p v-if="!singlePf" class="note">Elegí una cartera en el selector de arriba para ver también la línea de costo promedio y el tiempo con posición abierta.</p>
       </Panel>
 
       <div class="grid-2">

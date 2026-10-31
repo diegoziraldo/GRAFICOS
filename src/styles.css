@@ -158,3 +158,9 @@ select, input { background: var(--panel); border-color: var(--line); }
 .tag.pf { background: #1b2c52; color: #cfe0ff; } .sec { margin: 22px 0 10px; font-size: 15px; } .sec small { color: var(--muted); font-weight: 400; font-size: 12px; }
 .sub { color: var(--muted); font-size: 11px; } .note { color: var(--muted); }
 .sub.blk { display: block; }
+
+.chart-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; list-style: none; margin: 0 0 8px; padding: 0; font-size: 12px; color: var(--text); }
+.chart-legend li { display: flex; align-items: center; gap: 6px; } .chart-legend small { color: var(--muted); }
+.lg-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.lg-tri { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 10px solid; } .lg-tri.win { border-top-color: var(--gain); } .lg-tri.loss { border-top-color: var(--loss); }
+.lg-dash { width: 20px; border-top: 2px dashed var(--warn); } .lg-band { width: 18px; height: 10px; background: rgba(77,131,255,.25); border: 1px solid rgba(77,131,255,.5); }
