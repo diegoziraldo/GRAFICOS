@@ -1,6 +1,7 @@
 // Importación local (CSV/JSON). No escribe en ninguna base: solo carga datos
 // en memoria para explorar la app. Reutiliza la misma validación que la API.
 import { normalizeTrade } from '../api/client.js'
+import { normalizeCaucion } from './cauciones.js'
 
 const strip = (h) => h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/[\s-]+/g, '_')
 const ALIAS = {
@@ -114,11 +115,34 @@ const isPortfolioFile = (text) => {
   return (h.includes('name') || h.includes('nombre')) && !h.includes('ticker')
 }
 
-// Acepta varios archivos a la vez: operaciones (obligatorio) + carteras (opcional).
+const isCaucionFile = (text) => {
+  if (/^\s*[[{]/.test(text)) return /"tna"/.test(text) && /"(termDays|term_days)"/.test(text)
+  const h = (parseCsv(text)[0] || []).map(strip)
+  return h.includes('tna') && (h.includes('term_days') || h.includes('termdays'))
+}
+
+// Cauciones desde CSV (export de la base, snake_case) o JSON (formato de /api/cauciones).
+export function parseCauciones(text) {
+  let rows = []
+  if (/^\s*[[{]/.test(text)) {
+    try { const j = JSON.parse(text); rows = Array.isArray(j) ? j : j?.cauciones || [] } catch { throw new Error('El archivo de cauciones no es un JSON válido.') }
+  } else {
+    const t = parseCsv(text); const h = (t[0] || []).map(strip)
+    rows = t.slice(1).map((r) => Object.fromEntries(h.map((k, i) => [k, r[i]])))
+  }
+  return rows.map((r, i) => normalizeCaucion(r, i + 1)).filter(Boolean)
+}
+
+// Acepta varios archivos a la vez: operaciones + carteras y/o cauciones (todos opcionales salvo
+// que haya al menos operaciones o cauciones). Detecta cada archivo por su contenido.
 export function importFiles(files) {
-  const portfolioFile = files.find((f) => isPortfolioFile(f.text))
-  const tradesFile = files.find((f) => f !== portfolioFile)
-  if (!tradesFile) throw new Error('Falta el archivo de operaciones (trades).')
+  const caucionFile = files.find((f) => isCaucionFile(f.text))
+  const portfolioFile = files.find((f) => f !== caucionFile && isPortfolioFile(f.text))
+  const tradesFile = files.find((f) => f !== caucionFile && f !== portfolioFile)
+  if (!tradesFile && !caucionFile) throw new Error('Falta el archivo de operaciones (trades) o de cauciones.')
+  const cauciones = caucionFile ? parseCauciones(caucionFile.text) : []
+  if (caucionFile && !cauciones.length) throw new Error('No se encontró ninguna caución válida (revisá fecha, plazo, monto, TNA y comisión).')
+  if (!tradesFile) return { trades: [], portfolios: [], discarded: 0, cauciones }
   const names = portfolioFile ? parsePortfolioNames(portfolioFile.text) : new Map()
-  return importFromText(tradesFile.text, tradesFile.name, names)
+  return { ...importFromText(tradesFile.text, tradesFile.name, names), cauciones }
 }

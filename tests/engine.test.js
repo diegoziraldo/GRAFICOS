@@ -175,3 +175,56 @@ describe('detalle de activo', () => {
     expect(daysBetween('2025-01-01', '2025-01-31')).toBe(30)
   })
 })
+
+import { normalizeCaucion, caucionMetrics, groupCauciones, cumulativeRealized, addDays, isOverdue } from '../src/domain/cauciones.js'
+describe('cauciones', () => {
+  const base = { id: 1, startDate: '2026-09-29', termDays: 1, amount: 172594, currency: 'ARS', tna: 21.1, broker: 'IOL', feeType: 'FIXED', feeValue: 11.34, status: 'FINALIZADA' }
+  it('comisión fija (fila real del backup): bruto, neto y TNA neta', () => {
+    const c = normalizeCaucion(base)
+    expect(c.grossInterest).toBeCloseTo(99.77, 2); expect(c.brokerFee).toBe(11.34)
+    expect(c.netGain).toBeCloseTo(88.43, 2); expect(c.netTNA).toBeCloseTo(18.7, 1)
+    expect(c.endDate).toBe('2026-09-30'); expect(c.totalToReceive).toBeCloseTo(172594 + 88.43, 2)
+  })
+  it('comisión porcentual sobre el interés bruto', () => {
+    const c = normalizeCaucion({ ...base, amount: 100000, tna: 36.5, termDays: 10, feeType: 'PERCENT', feeValue: 10 })
+    expect(c.grossInterest).toBe(1000); expect(c.brokerFee).toBe(100); expect(c.netGain).toBe(900); expect(c.netTNA).toBeCloseTo(32.85, 2)
+  })
+  it('acepta snake_case de un CSV y descarta filas inválidas', () => {
+    const c = normalizeCaucion({ id: '2', start_date: '2026-09-30', term_days: '1', amount: '172683', currency: 'ARS', tna: '25.1', fee_type: 'FIXED', fee_value: '11.35', status: 'FINALIZADA' })
+    expect(c.netGain).toBeCloseTo(172683 * 0.251 / 365 - 11.35, 1)
+    expect(normalizeCaucion({ ...base, amount: 0 })).toBeNull(); expect(normalizeCaucion({ ...base, feeType: 'X' })).toBeNull()
+    expect(normalizeCaucion({ ...base, startDate: 'ayer' })).toBeNull()
+  })
+  it('fechas: vencimiento en UTC y caución vencida sin finalizar', () => {
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01')
+    expect(isOverdue(normalizeCaucion({ ...base, status: 'ACTIVA' }), '2026-10-05')).toBe(true)
+    expect(isOverdue(normalizeCaucion({ ...base, status: 'FINALIZADA' }), '2026-10-05')).toBe(false)
+  })
+  it('métricas: cobrada vs proyectada, capital activo y TNA neta ponderada por capital-días', () => {
+    const a = normalizeCaucion({ ...base, id: 1, amount: 100000, tna: 36.5, termDays: 10, feeType: 'PERCENT', feeValue: 10 }) // neto 900
+    const b = normalizeCaucion({ ...base, id: 2, amount: 200000, tna: 36.5, termDays: 5, feeType: 'PERCENT', feeValue: 0, status: 'ACTIVA', startDate: '2026-11-10' }) // neto 1000
+    const m = caucionMetrics([a, b], '2026-11-12')
+    expect(m.realized).toBe(900); expect(m.projected).toBe(1000); expect(m.net).toBe(1900); expect(m.capitalActive).toBe(200000)
+    expect(m.tnaNet).toBeCloseTo((1900 / (100000 * 10 + 200000 * 5)) * 365 * 100, 6)
+    expect(m.next.id).toBe(2); expect(m.overdueCount).toBe(0); expect(m.feeShare).toBeCloseTo(100 / 2000, 6)
+    expect(caucionMetrics([], '2026-11-12')).toMatchObject({ count: 0, net: 0, tnaNet: null, next: null })
+  })
+  it('agrupación por vencimiento y acumulado cobrado', () => {
+    const l = [
+      normalizeCaucion({ ...base, id: 1, startDate: '2026-09-29' }), normalizeCaucion({ ...base, id: 2, startDate: '2026-10-05' }),
+      normalizeCaucion({ ...base, id: 3, startDate: '2026-10-06', status: 'ACTIVA' }),
+    ]
+    const g = groupCauciones(l, 'month')
+    expect(g.map((x) => x.key)).toEqual(['2026-09', '2026-10'])
+    expect(g[1].realized).toBeCloseTo(88.43, 2); expect(g[1].projected).toBeCloseTo(88.43, 2)
+    const c = cumulativeRealized(l); expect(c).toHaveLength(2); expect(c[1].value).toBeCloseTo(176.86, 2)
+  })
+  it('importa el export de la base (cabeceras partidas por CHECK) junto a las operaciones', () => {
+    const cau = "id,start_date,term_days,amount,currency,'USD')),tna,broker,fee_type,'FIXED')),fee_value,status,'FINALIZADA')),notes,created_at,updated_at\n\"1\",\"2026-09-29\",\"1\",\"172594\",\"ARS\",\"\",\"21.1\",\"IOL\",\"FIXED\",\"\",\"11.34\",\"FINALIZADA\",\"\",\"IOL\",\"2026-09-29 20:01:22\",\"2026-09-30 17:40:13\""
+    const trades = 'fecha,ticker,operacion,cantidad,precio\n2026-01-02,X,COMPRA,1,10'
+    const r = importFiles([{ name: 'cauciones.csv', text: cau }, { name: 'trades.csv', text: trades }])
+    expect(r.trades).toHaveLength(1); expect(r.cauciones).toHaveLength(1)
+    expect(r.cauciones[0]).toMatchObject({ broker: 'IOL', status: 'FINALIZADA', netGain: 88.43 })
+    const only = importFiles([{ name: 'c.csv', text: cau }]); expect(only.trades).toEqual([]); expect(only.cauciones).toHaveLength(1)
+  })
+})

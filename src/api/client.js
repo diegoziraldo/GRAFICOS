@@ -1,4 +1,5 @@
 // Capa de acceso a la API. Solo lectura: esta app nunca modifica operaciones.
+import { normalizeCaucion } from '../domain/cauciones.js'
 const BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')
 
 async function get(path) {
@@ -59,4 +60,11 @@ export async function fetchTrades() {
 export async function fetchPortfolios() {
   const raw = await get('/portfolios')
   return Array.isArray(raw) ? raw.map((p) => ({ id: p.id, name: p.name })) : []
+}
+
+// Cauciones: lectura de GET /api/cauciones. Las filas inválidas se descartan.
+export async function fetchCauciones() {
+  const raw = await get('/cauciones')
+  if (!Array.isArray(raw)) throw new Error('Respuesta inesperada de /cauciones')
+  return raw.map((r, i) => normalizeCaucion(r, i + 1)).filter(Boolean)
 }

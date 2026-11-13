@@ -1,8 +1,10 @@
 <script setup>
 import { ref } from 'vue'
 import { useDesk } from '../composables/useDesk.js'
-import { importFromText, importFiles } from '../domain/importer.js'
+import { importFiles } from '../domain/importer.js'
 import sample from '../assets/sample-trades.csv?raw'
+import sampleCau from '../assets/sample-cauciones.csv?raw'
+import { iso } from '../domain/periods.js'
 
 const { useImported } = useDesk()
 const input = ref(null)
@@ -18,7 +20,11 @@ async function onFile(e) {
   }
   catch (err) { msg.value = err.message }
 }
-function loadSample() { useImported(importFromText(sample, 'sample.csv'), 'datos de muestra'); msg.value = '' }
+function loadSample() {
+  // Una caución activa que arranca hoy, para que se vea el "próximo vencimiento".
+  const live = `\n99,${iso(new Date())},7,500000,ARS,24.5,IOL,FIXED,22,ACTIVA,`
+  useImported(importFiles([{ name: 'sample-trades.csv', text: sample }, { name: 'sample-cauciones.csv', text: sampleCau + live }]), 'datos de muestra'); msg.value = ''
+}
 </script>
 <template>
   <div class="import-menu">

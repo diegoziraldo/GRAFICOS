@@ -6,6 +6,7 @@ import AssetDetail from './views/AssetDetail.vue'
 import Stats from './views/Stats.vue'
 import Calendar from './views/Calendar.vue'
 import Compare from './views/Compare.vue'
+import Cauciones from './views/Cauciones.vue'
 
 export default createRouter({
   history: createWebHashHistory(),
@@ -14,6 +15,7 @@ export default createRouter({
     { path: '/operaciones', component: Trades, meta: { title: 'Operaciones' } },
     { path: '/activos', component: Assets, meta: { title: 'Activos' } },
     { path: '/activos/:ticker', component: AssetDetail, meta: { title: 'Detalle de activo' } },
+    { path: '/cauciones', component: Cauciones, meta: { title: 'Cauciones' } },
     { path: '/estadisticas', component: Stats, meta: { title: 'Estadísticas' } },
     { path: '/calendario', component: Calendar, meta: { title: 'Calendario' } },
     { path: '/comparar', component: Compare, meta: { title: 'Comparar períodos' } },

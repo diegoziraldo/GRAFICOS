@@ -234,3 +234,6 @@ main { padding: 16px var(--gutter) 40px; max-width: 1680px; margin-inline: auto;
 @media (max-width: 380px) { .row-big { grid-template-columns: minmax(0, 1fr); } }
 .donut-wrap { grid-template-columns: minmax(0, 1fr); } .donut { min-width: 0; max-width: 260px; width: 100%; margin-inline: auto; }
 .cal-title { text-transform: none !important; } .cal-title::first-letter { text-transform: uppercase; }
+
+.tag.done { background: #0f3b2e; color: #7bf0c0; } .notes { max-width: 180px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+@media (max-width: 420px) { .side nav a { font-size: 9px; } }

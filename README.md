@@ -3,7 +3,7 @@
 Un solo proyecto con todo lo necesario:
 
 - **Frontend** Vue 3 + Vite (`src/`).
-- **Backend** Hono (`worker/index.js` para Workers, `functions/api/[[route]].js` para Pages): API de **solo lectura** (`GET /api/trades`, `GET /api/portfolios`, `GET /api/health`). Usa tus archivos `functions/_lib/trades.js` y `portfolios.js` sin cambios, sobre tu base **D1 existente**.
+- **Backend** Hono (`worker/index.js` para Workers, `functions/api/[[route]].js` para Pages): API de **solo lectura** (`GET /api/trades`, `/api/portfolios`, `/api/cauciones`, `/api/cauciones/summary`, `/api/health`). Usa tus archivos `functions/_lib/trades.js`, `portfolios.js` y `cauciones.js` sin cambios, sobre tu base **D1 existente**.
 - **No toca la base**: no hay rutas para crear, editar ni borrar. No hace falta correr migraciones (tu D1 ya tiene `ccl`, `sector` y `portfolio_id`).
 
 > Es un proyecto **nuevo** de Pages: no reemplaza tu bitácora actual (`trader-page`). Los dos pueden compartir la misma base D1.
@@ -37,6 +37,14 @@ Creá el proyecto desde "Looking to deploy Pages? Get started" (build `npm run b
 - *"devolvió una página web (HTML)"* → el binding o las Functions no están: revisá que exista la carpeta `functions/` en la raíz del repo y que `/api/health` responda JSON.
 - `/api/health` dice `"db": false` → falta el binding `DB` (paso 5) o no hiciste el redeploy (paso 6).
 - Selector de carteras con `(0)` → esas carteras no tienen operaciones asignadas en la tabla `trades` (`portfolio_id`).
+
+## Cauciones
+Pantalla **Cauciones** (y resumen en el Panel) sobre la tabla `cauciones` de tu D1. Fórmulas idénticas a `functions/_lib/cauciones.js`: interés bruto = monto × TNA × días/365; ganancia neta = bruto − comisión (fija o % del interés); TNA neta = neta/monto × 365/días.
+- El período de la barra superior se aplica por **fecha de vencimiento** (cuando se cobra el interés). Cartera e instrumento no aplican.
+- ARS y USD se muestran por separado: una caución no tiene tipo de cambio y no se convierte.
+- *Cobrada* = estado Finalizada · *Proyectada* = estado Activa. Una activa con vencimiento pasado se marca "Vencida sin finalizar" y cuenta como proyectada.
+- En el Panel, «Resultado total» suma el resultado de trading + intereses cobrados de cauciones, mostrando el desglose.
+- Con el botón *Importar archivo* podés cargar `cauciones.csv` (del backup) junto con `trades.csv` y `portfolios.csv`.
 
 ## Método de cálculo y límites
 Costo promedio ponderado por (cartera, ticker); comisión de compra suma al costo, comisión de venta resta del resultado; USD con el CCL de cada operación (si falta, no se estima); las ventas se asignan al período por fecha de venta. No hay precios de mercado en la base, así que no se muestran resultado no realizado ni patrimonio a mercado.

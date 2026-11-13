@@ -5,13 +5,14 @@ import { money, signedMoney, pct, date, num, tone, qty } from '../domain/format.
 import CurrencyBlock from '../components/CurrencyBlock.vue'
 import Panel from '../components/Panel.vue'
 
-const { currencies, events, filteredTrades, ledger, discarded, metricsFor, portfolioName } = useDesk()
+const { cauciones, caucionMetricsFor, currencies, events, filteredTrades, ledger, discarded, metricsFor, portfolioName } = useDesk()
 const cur0 = computed(() => currencies.value[0])
 const byId = computed(() => new Map(events.value.map((e) => [e.id, e])))
 const recent = computed(() => [...filteredTrades.value].reverse().slice(0, 7).map((t) => {
   const e = byId.value.get(t.id)
   return { ...t, result: e ? (cur0.value === 'USD' ? e.plUSD : e.pl) : null, pctv: e ? (cur0.value === 'USD' ? e.plPctUSD : e.plPct) : null }
 }))
+const cauSum = computed(() => currencies.value.map((c) => ({ c, total: cauciones.value.filter((x) => x.currency === c).length, m: caucionMetricsFor(c) })).filter((x) => x.total))
 const both = computed(() => ['ARS', 'USD'].map((c) => ({ c, m: metricsFor(c) })))
 </script>
 
@@ -21,6 +22,18 @@ const both = computed(() => ['ARS', 'USD'].map((c) => ({ c, m: metricsFor(c) }))
     <p v-if="ledger.anomalies.length" class="warn">{{ ledger.anomalies.length }} venta(s) sin posición suficiente fueron recortadas o ignoradas.</p>
 
     <CurrencyBlock v-for="c in currencies" :key="c" :cur="c" />
+
+    <Panel v-if="cauSum.length" title="Cauciones" note="Intereses netos de comisión. El período se aplica por fecha de vencimiento.">
+      <template #actions><router-link to="/cauciones">Ver detalle</router-link></template>
+      <div class="cur-sum">
+        <div v-for="x in cauSum" :key="x.c"><h4>{{ x.c }}</h4>
+          <span>Capital colocado hoy</span><b class="num">{{ money(x.m.capitalActive, x.c) }}</b>
+          <span>Ganancia neta cobrada</span><b class="num" :class="tone(x.m.realized)">{{ signedMoney(x.m.realized, x.c) }}</b>
+          <span>Ganancia neta proyectada</span><b class="num" :class="tone(x.m.projected)">{{ signedMoney(x.m.projected, x.c) }}</b>
+          <span>TNA neta promedio</span><b class="num">{{ x.m.tnaNet == null ? '—' : num(x.m.tnaNet, 2) + '%' }}</b>
+        </div>
+      </div>
+    </Panel>
 
     <div class="grid-ops">
       <Panel title="Últimas operaciones">

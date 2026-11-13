@@ -7,6 +7,7 @@
 import { Hono } from 'hono';
 import * as trades from '../functions/_lib/trades.js';
 import * as portfolios from '../functions/_lib/portfolios.js';
+import * as cauciones from '../functions/_lib/cauciones.js';
 
 const app = new Hono().basePath('/api');
 
@@ -30,6 +31,8 @@ function h(fn) {
 app.get('/health', (c) => c.json({ status: 'ok', mode: 'read-only', db: Boolean(c.env.DB) }));
 app.get('/trades', h(async (c) => c.json(await trades.getAll(c.env.DB))));
 app.get('/portfolios', h(async (c) => c.json(await portfolios.getAllPortfolios(c.env.DB))));
+app.get('/cauciones/summary', h(async (c) => c.json(await cauciones.getSummary(c.env.DB))));
+app.get('/cauciones', h(async (c) => c.json(await cauciones.getAll(c.env.DB))));
 app.notFound((c) => c.json({ error: 'No encontrado (API de solo lectura)' }, 404));
 
 export default {

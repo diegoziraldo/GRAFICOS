@@ -10,8 +10,10 @@ import Panel from './Panel.vue'
 import ChartCanvas from './ChartCanvas.vue'
 
 const props = defineProps({ cur: { type: String, required: true } })
-const { events, metricsFor, openPositions, portfolioName } = useDesk()
+const { events, metricsFor, openPositions, portfolioName, caucionMetricsFor } = useDesk()
 const m = computed(() => metricsFor(props.cur))
+const cau = computed(() => caucionMetricsFor(props.cur)) // intereses cobrados de cauciones (por vencimiento)
+const total = computed(() => m.value.net + cau.value.realized)
 const group = ref('month')
 const tab = ref('win')
 const GROUPS = [['day', 'Día'], ['week', 'Sem.'], ['month', 'Mes'], ['quarter', 'Trim.'], ['year', 'Año']]
@@ -103,7 +105,7 @@ const matrix = computed(() => {
     <div class="row-big">
       <div class="big accent-a"><span>Resultado realizado neto</span><b class="num" :class="tone(m.net)">{{ signedMoney(m.net, cur) }}</b><em class="num" :class="tone(m.returnPct)">{{ pct(m.returnPct) }}</em><small>Ganancias − pérdidas − costos de venta</small></div>
       <div class="big accent-b muted"><span>Resultado no realizado</span><b>No disponible</b><small>El backend no guarda precios de mercado</small></div>
-      <div class="big accent-c"><span>Resultado total (solo realizado)</span><b class="num" :class="tone(m.net)">{{ signedMoney(m.net, cur) }}</b><small>Sin duplicar posiciones abiertas</small></div>
+      <div class="big accent-c"><span>{{ cau.count ? 'Resultado total (trading + cauciones)' : 'Resultado total (solo realizado)' }}</span><b class="num" :class="tone(total)">{{ signedMoney(total, cur) }}</b><small v-if="cau.count">Trading {{ signedMoney(m.net, cur) }} + cauciones {{ signedMoney(cau.realized, cur) }}</small><small v-else>Sin duplicar posiciones abiertas</small></div>
       <div class="big accent-d"><span>Capital en posiciones abiertas</span><b class="num">{{ openCapital == null ? 'Faltan CCL' : money(openCapital, cur) }}</b><small>Valuado a costo, no a mercado</small></div>
     </div>
 

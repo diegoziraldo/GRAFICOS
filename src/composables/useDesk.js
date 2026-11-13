@@ -1,7 +1,8 @@
 import { reactive, ref, computed } from 'vue'
-import { fetchTrades, fetchPortfolios } from '../api/client.js'
+import { fetchTrades, fetchPortfolios, fetchCauciones } from '../api/client.js'
 import { buildLedger } from '../domain/engine.js'
 import { computeMetrics } from '../domain/metrics.js'
+import { caucionMetrics } from '../domain/cauciones.js'
 import { resolvePeriod, inRange } from '../domain/periods.js'
 
 // Estado global único (singleton): datos crudos, filtros y derivados.
@@ -11,6 +12,8 @@ const trades = ref([])
 const portfolios = ref([])
 const discarded = ref(0)
 const portfoliosError = ref('')
+const cauciones = ref([])
+const caucionesError = ref('')
 const source = ref('api') // 'api' | 'file'
 const sourceLabel = ref('')
 
@@ -30,6 +33,10 @@ const passes = (x) =>
 const events = computed(() => ledger.value.events.filter((e) => passes(e) && inRange(e.date, range.value)))
 const openPositions = computed(() => ledger.value.open.filter(passes))
 const filteredTrades = computed(() => trades.value.filter((t) => passes(t) && inRange(t.date, range.value)))
+// Cauciones: el período se aplica por fecha de VENCIMIENTO (cuando se cobra el interés).
+// Cartera e instrumento no aplican. Cada moneda es la propia de la caución (sin conversión).
+const caucionesFor = (cur) => cauciones.value.filter((c) => c.currency === cur && inRange(c.endDate, range.value))
+const caucionMetricsFor = (cur) => caucionMetrics(caucionesFor(cur))
 const metricsFor = (cur, evs = events.value) => computeMetrics(evs, cur)
 
 // Carteras de la API + cualquier cartera referenciada por operaciones que la API no listó.
@@ -49,10 +56,13 @@ async function load() {
   error.value = ''
   try {
     portfoliosError.value = ''
-    const [t, p] = await Promise.all([
+    caucionesError.value = ''
+    const [t, p, cau] = await Promise.all([
       fetchTrades(),
       fetchPortfolios().catch((e) => { portfoliosError.value = e.message; return [] }),
+      fetchCauciones().catch((e) => { caucionesError.value = e.message; return [] }),
     ])
+    cauciones.value = cau
     trades.value = t.trades
     discarded.value = t.discarded
     portfolios.value = p
@@ -64,6 +74,7 @@ async function load() {
 }
 function useImported(data, label) {
   trades.value = data.trades; portfolios.value = data.portfolios; discarded.value = data.discarded
+  cauciones.value = data.cauciones || []; caucionesError.value = ''
   error.value = ''; portfoliosError.value = ''; loading.value = false; source.value = 'file'; sourceLabel.value = label
   filters.portfolio = 'all'
 }
@@ -71,7 +82,7 @@ const resetFilters = () => Object.assign(filters, defaults())
 
 export function useDesk() {
   return {
-    loading, error, portfoliosError, portfolioOptions, unassigned, source, sourceLabel, useImported, trades, portfolios, discarded, filters, ledger, range, currencies,
+    loading, error, portfoliosError, cauciones, caucionesError, caucionesFor, caucionMetricsFor, portfolioOptions, unassigned, source, sourceLabel, useImported, trades, portfolios, discarded, filters, ledger, range, currencies,
     events, openPositions, filteredTrades, metricsFor, portfolioName, load, resetFilters,
   }
 }
